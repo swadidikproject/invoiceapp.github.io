@@ -1,0 +1,72 @@
+:root {
+    --primary-color: #4e73df;
+    --success-color: #1cc88a;
+    --info-color: #36b9cc;
+    --warning-color: #f6c23e;
+    --danger-color: #e74a3b;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fc;
+}
+
+.sidebar {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #4e73df 0%, #224abe 100%);
+}
+
+.nav-link {
+    color: rgba(255,255,255,.8);
+    padding: 1rem;
+}
+
+.nav-link:hover {
+    color: white;
+    background: rgba(255,255,255,.1);
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.card-header {
+    background-color: white;
+    border-bottom: 1px solid #e3e6f0;
+    padding: 1rem 1.5rem;
+}
+
+.badge {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+}
+
+.table th {
+    border-top: none;
+    color: #5a5c69;
+    font-weight: 600;
+}
+
+.btn {
+    border-radius: 10px;
+    padding: 0.5rem 1rem;
+}
+
+.invoice-status {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.dashboard-card {
+    border-left: 4px solid;
+    transition: transform 0.3s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
