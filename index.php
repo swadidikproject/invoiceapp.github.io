@@ -1,3 +1,38 @@
+<?php
+require_once 'config_database.php';
+require_once 'include_functions.php';
+
+// Get statistics
+$totalInvoices = $pdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
+$paidInvoices = $pdo->query("SELECT COUNT(*) FROM invoices WHERE status = 'paid'")->fetchColumn();
+$unpaidInvoices = $pdo->query("SELECT COUNT(*) FROM invoices WHERE status = 'unpaid'")->fetchColumn();
+
+$totalRevenue = $pdo->query("SELECT SUM(total) FROM invoices WHERE status = 'paid'")->fetchColumn();
+$totalRevenue = $totalRevenue ?? 0;
+
+// Get monthly statistics for chart (optional)
+$monthlyStats = $pdo->query("
+    SELECT 
+        DATE_FORMAT(created_at, '%Y-%m') as month,
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END) as revenue
+    FROM invoices 
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+    GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+    ORDER BY month DESC
+")->fetchAll();
+
+// Get recent invoices
+$stmt = $pdo->query("
+    SELECT i.*, c.name as customer_name 
+    FROM invoices i 
+    LEFT JOIN customers c ON i.customer_id = c.id 
+    ORDER BY i.created_at DESC 
+    LIMIT 10
+");
+$invoices = $stmt->fetchAll();
+?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -12,7 +47,7 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Chart.js untuk grafik -->
+    <!-- Chart.js untuk grafik (opsional) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     
     <style>
@@ -495,22 +530,22 @@
                     </div>
                     <ul class="nav flex-column mt-3">
                         <li class="nav-item">
-                            <a class="nav-link active" href="#">
+                            <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : '' ?>" href="index.php">
                                 <i class="bi bi-speedometer2"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">
+                            <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'add_invoice.php' ? 'active' : '' ?>" href="add_invoice.php">
                                 <i class="bi bi-plus-circle"></i> Buat Invoice
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">
+                            <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'customers.php' || basename($_SERVER['PHP_SELF']) == 'add_customer.php' || basename($_SERVER['PHP_SELF']) == 'view_customer.php' ? 'active' : '' ?>" href="customers.php">
                                 <i class="bi bi-people"></i> Pelanggan
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">
+                            <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'invoices.php' ? 'active' : '' ?>" href="invoices.php">
                                 <i class="bi bi-file-text"></i> Daftar Invoice
                             </a>
                         </li>
@@ -526,10 +561,10 @@
                     <p>Kelola invoice dan pelanggan Anda dengan mudah dan efisien</p>
                     <i class="bi bi-receipt"></i>
                     <div class="quick-actions">
-                        <a href="#" class="quick-action-btn">
+                        <a href="add_invoice.php" class="quick-action-btn">
                             <i class="bi bi-plus-circle"></i> Buat Invoice Baru
                         </a>
-                        <a href="#" class="quick-action-btn">
+                        <a href="customers.php" class="quick-action-btn">
                             <i class="bi bi-people"></i> Kelola Pelanggan
                         </a>
                     </div>
@@ -541,17 +576,17 @@
                         <h1 class="h2 mb-1">Dashboard</h1>
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb mb-0">
-                                <li class="breadcrumb-item"><a href="#">Dashboard</a></li>
+                                <li class="breadcrumb-item"><a href="index.php">Dashboard</a></li>
                                 <li class="breadcrumb-item active">Overview</li>
                             </ol>
                         </nav>
                     </div>
-                    <a href="#" class="btn-create">
+                    <a href="add_invoice.php" class="btn-create">
                         <i class="bi bi-plus-circle"></i> Invoice Baru
                     </a>
                 </div>
 
-                <!-- Statistics Cards (Contoh Data Statis) -->
+                <!-- Statistics Cards -->
                 <div class="row g-4 mb-4">
                     <div class="col-xl-3 col-md-6">
                         <div class="summary-card">
@@ -559,7 +594,7 @@
                                 <i class="bi bi-receipt"></i>
                             </div>
                             <div class="summary-label">Total Invoice</div>
-                            <div class="summary-value">1.250</div>
+                            <div class="summary-value"><?= number_format($totalInvoices, 0, ',', '.') ?></div>
                             <div class="summary-sub">Semua invoice</div>
                         </div>
                     </div>
@@ -570,7 +605,7 @@
                                 <i class="bi bi-check-circle"></i>
                             </div>
                             <div class="summary-label">Lunas</div>
-                            <div class="summary-value">980</div>
+                            <div class="summary-value"><?= number_format($paidInvoices, 0, ',', '.') ?></div>
                             <div class="summary-sub">Invoice terbayar</div>
                         </div>
                     </div>
@@ -581,7 +616,7 @@
                                 <i class="bi bi-clock"></i>
                             </div>
                             <div class="summary-label">Belum Dibayar</div>
-                            <div class="summary-value">270</div>
+                            <div class="summary-value"><?= number_format($unpaidInvoices, 0, ',', '.') ?></div>
                             <div class="summary-sub">Menunggu pembayaran</div>
                         </div>
                     </div>
@@ -592,13 +627,14 @@
                                 <i class="bi bi-cash-stack"></i>
                             </div>
                             <div class="summary-label">Total Pendapatan</div>
-                            <div class="summary-value">Rp 450.500.000</div>
+                            <div class="summary-value"><?= formatRupiah($totalRevenue) ?></div>
                             <div class="summary-sub">Dari invoice lunas</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Chart Section -->
+                <!-- Chart Section (Optional - jika ingin menampilkan grafik) -->
+                <?php if (count($monthlyStats) > 0): ?>
                 <div class="chart-card">
                     <div class="card-header">
                         <h6><i class="bi bi-graph-up"></i> Statistik 6 Bulan Terakhir</h6>
@@ -607,6 +643,7 @@
                         <canvas id="revenueChart" style="height: 300px;"></canvas>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Recent Invoices Table -->
                 <div class="table-card">
@@ -616,7 +653,7 @@
                                 <h6><i class="bi bi-clock-history"></i> Invoice Terbaru</h6>
                             </div>
                             <div class="col-md-6 text-end">
-                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                <a href="invoices.php" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-arrow-right"></i> Lihat Semua
                                 </a>
                             </div>
@@ -636,167 +673,64 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <!-- Data Invoice Contoh -->
-                                    <tr>
-                                        <td>
-                                            <a href="#" class="invoice-number">INV-2024-001</a>
-                                        </td>
-                                        <td>
-                                            <span class="customer-name">PT Maju Jaya</span>
-                                        </td>
-                                        <td>15/01/2024</td>
-                                        <td>
-                                            <strong>Rp 15.750.000</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge-status badge-paid">
-                                                <i class="bi bi-check-circle"></i> Lunas
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-group">
-                                                <a href="#" class="btn-action btn-view" title="Lihat Detail">
-                                                    <i class="bi bi-eye"></i>
+                                    <?php if (count($invoices) > 0): ?>
+                                        <?php foreach($invoices as $invoice): ?>
+                                        <tr>
+                                            <td>
+                                                <a href="view_invoice.php?id=<?= $invoice['id'] ?>" class="invoice-number">
+                                                    <?= $invoice['invoice_number'] ?>
                                                 </a>
-                                                <a href="#" class="btn-action btn-edit" title="Edit Invoice">
-                                                    <i class="bi bi-pencil"></i>
+                                            </td>
+                                            <td>
+                                                <span class="customer-name">
+                                                    <?= $invoice['customer_name'] ?? '<span class="text-muted">- Pelanggan Umum -</span>' ?>
+                                                </span>
+                                            </td>
+                                            <td><?= date('d/m/Y', strtotime($invoice['invoice_date'])) ?></td>
+                                            <td>
+                                                <strong><?= formatRupiah($invoice['total']) ?></strong>
+                                            </td>
+                                            <td>
+                                                <?php if ($invoice['status'] == 'paid'): ?>
+                                                    <span class="badge-status badge-paid">
+                                                        <i class="bi bi-check-circle"></i> Lunas
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge-status badge-unpaid">
+                                                        <i class="bi bi-clock"></i> Belum Dibayar
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="action-group">
+                                                    <a href="view_invoice.php?id=<?= $invoice['id'] ?>" class="btn-action btn-view" title="Lihat Detail">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    <a href="edit_invoice.php?id=<?= $invoice['id'] ?>" class="btn-action btn-edit" title="Edit Invoice">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a href="delete_invoice.php?id=<?= $invoice['id'] ?>" 
+                                                       class="btn-action btn-delete" 
+                                                       onclick="return confirm('Yakin ingin menghapus invoice ini? Data yang dihapus tidak dapat dikembalikan.')"
+                                                       title="Hapus Invoice">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4">
+                                                <i class="bi bi-file-text" style="font-size: 3rem; color: #dee2e6;"></i>
+                                                <h5 class="mt-3 text-muted">Belum Ada Invoice</h5>
+                                                <p class="text-muted">Buat invoice pertama Anda untuk memulai.</p>
+                                                <a href="add_invoice.php" class="btn-create">
+                                                    <i class="bi bi-plus-circle"></i> Buat Invoice Baru
                                                 </a>
-                                                <a href="#" class="btn-action btn-delete" 
-                                                   onclick="return confirm('Yakin ingin menghapus invoice ini? Data yang dihapus tidak dapat dikembalikan.')"
-                                                   title="Hapus Invoice">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <a href="#" class="invoice-number">INV-2024-002</a>
-                                        </td>
-                                        <td>
-                                            <span class="customer-name">CV Sukses Abadi</span>
-                                        </td>
-                                        <td>14/01/2024</td>
-                                        <td>
-                                            <strong>Rp 8.450.000</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge-status badge-unpaid">
-                                                <i class="bi bi-clock"></i> Belum Dibayar
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-group">
-                                                <a href="#" class="btn-action btn-view" title="Lihat Detail">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-edit" title="Edit Invoice">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-delete" 
-                                                   onclick="return confirm('Yakin ingin menghapus invoice ini? Data yang dihapus tidak dapat dikembalikan.')"
-                                                   title="Hapus Invoice">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <a href="#" class="invoice-number">INV-2024-003</a>
-                                        </td>
-                                        <td>
-                                            <span class="customer-name">Toko Berkah</span>
-                                        </td>
-                                        <td>13/01/2024</td>
-                                        <td>
-                                            <strong>Rp 22.300.000</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge-status badge-paid">
-                                                <i class="bi bi-check-circle"></i> Lunas
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-group">
-                                                <a href="#" class="btn-action btn-view" title="Lihat Detail">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-edit" title="Edit Invoice">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-delete" 
-                                                   onclick="return confirm('Yakin ingin menghapus invoice ini? Data yang dihapus tidak dapat dikembalikan.')"
-                                                   title="Hapus Invoice">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <a href="#" class="invoice-number">INV-2024-004</a>
-                                        </td>
-                                        <td>
-                                            <span class="customer-name">UD Makmur</span>
-                                        </td>
-                                        <td>12/01/2024</td>
-                                        <td>
-                                            <strong>Rp 5.950.000</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge-status badge-paid">
-                                                <i class="bi bi-check-circle"></i> Lunas
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-group">
-                                                <a href="#" class="btn-action btn-view" title="Lihat Detail">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-edit" title="Edit Invoice">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-delete" 
-                                                   onclick="return confirm('Yakin ingin menghapus invoice ini? Data yang dihapus tidak dapat dikembalikan.')"
-                                                   title="Hapus Invoice">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>
-                                            <a href="#" class="invoice-number">INV-2024-005</a>
-                                        </td>
-                                        <td>
-                                            <span class="customer-name">PT Sentosa</span>
-                                        </td>
-                                        <td>11/01/2024</td>
-                                        <td>
-                                            <strong>Rp 18.250.000</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge-status badge-unpaid">
-                                                <i class="bi bi-clock"></i> Belum Dibayar
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-group">
-                                                <a href="#" class="btn-action btn-view" title="Lihat Detail">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-edit" title="Edit Invoice">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <a href="#" class="btn-action btn-delete" 
-                                                   onclick="return confirm('Yakin ingin menghapus invoice ini? Data yang dihapus tidak dapat dikembalikan.')"
-                                                   title="Hapus Invoice">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -809,14 +743,15 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Chart Initialization -->
+    <!-- Chart Initialization (jika ada chart) -->
+    <?php if (count($monthlyStats) > 0): ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('revenueChart').getContext('2d');
             
-            // Data contoh untuk chart
-            const months = ['2024-01', '2024-02', '2024-03', '2024-04', '2024-05', '2024-06'];
-            const revenue = [85000000, 92000000, 78000000, 110000000, 95000000, 125000000];
+            // Prepare data
+            const months = <?= json_encode(array_column($monthlyStats, 'month')) ?>;
+            const revenue = <?= json_encode(array_column($monthlyStats, 'revenue')) ?>;
             
             new Chart(ctx, {
                 type: 'line',
@@ -856,6 +791,7 @@
             });
         });
     </script>
+    <?php endif; ?>
     
     <!-- Tooltip Initialization -->
     <script>
