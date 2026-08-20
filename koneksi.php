@@ -2,7 +2,7 @@
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "iuranrt"; // Silakan sesuaikan dengan nama database Anda
+$db   = "db_invoice"; // Silakan sesuaikan dengan nama database Anda
 
 $conn = mysqli_connect($host, $user, $pass, $db);
 
