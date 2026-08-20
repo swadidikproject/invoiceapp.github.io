@@ -9,7 +9,7 @@ function generateInvoiceNumber($pdo) {
     $result = $stmt->fetch();
     
     $number = $result['total'] + 1;
-    $invoiceNumber = 'INV/PGM/' . $year . $month . str_pad($number, 4, '0', STR_PAD_LEFT);
+    $invoiceNumber = 'INV/PT.ABC/' . $year . $month . str_pad($number, 4, '0', STR_PAD_LEFT);
     
     return $invoiceNumber;
 }
